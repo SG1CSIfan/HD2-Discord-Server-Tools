@@ -29,4 +29,46 @@ function generateSupportEmbed() {
     return { embed, row };
 }
 
-module.exports = { generateSupportEmbed };
+
+
+//Ticket submission info embed.
+function generateSubmissionEmbed(data) {
+    const embed = new EmbedBuilder()
+        .setTitle('🎟️ New Ticket Submission')
+        .setDescription('A new ticket has been submitted.')
+        .setColor(0x1f8b4c)
+        .addFields(
+            { name: 'User', value: data.user, inline: true },
+            { name: 'Date & Time', value: `<t:${data.timestamp}:F>`, inline: true },
+            { name: 'Tag', value: data.tag, inline: false },
+            { name: 'Type of Issue', value: data.issueType, inline: false },
+            { name: 'Details', value: data.details, inline: false }
+        );
+
+    // Add Player Issue Name field conditionally
+    if (data.tag === 'Player Issue') {
+        embed.addFields({
+            name: 'Player Issue Name',
+            value: data.playerName || 'None',
+            inline: true,
+        });
+    }
+
+    return embed;
+}
+
+//Ticket submission closed embed.
+function generateClosureEmbed(data) {
+    return new EmbedBuilder()
+        .setTitle('🔒 Ticket Closed')
+        .setDescription('The ticket has been closed.')
+        .setColor(0x2e3136)
+        .addFields(
+            { name: 'Closed By', value: data.closedBy, inline: true },
+            { name: 'Date & Time', value: `<t:${data.timestamp}:F>`, inline: true },
+            { name: 'Resolved', value: data.resolved, inline: false },
+            { name: 'Summary', value: data.summary || 'No summary provided.', inline: false }
+        );
+}
+
+module.exports = { generateSupportEmbed, generateSubmissionEmbed, generateClosureEmbed };

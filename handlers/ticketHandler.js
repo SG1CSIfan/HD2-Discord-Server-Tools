@@ -1,6 +1,6 @@
 const { PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { loadTicketSettings, saveTicketSettings } = require('../utils/fileUtils');
-const { generateSupportEmbed } = require('../embedHandlers/supportEmbed');
+const { generateSupportEmbed, generateSubmissionEmbed, generateClosureEmbed } = require('../embedHandlers/supportEmbed');
 const { logInfo, logError } = require('./loggingHandler');
 const fs = require('fs');
 const path = require('path');
@@ -149,9 +149,13 @@ async function showIssueModal(interaction, issueTag) {
 //Handle ticket creation from modal submission.
 async function handleModalSubmission(interaction) {
     try {
+        // Retrieve modal inputs
         const issueType = interaction.fields.getTextInputValue('issue_type');
         const issueDetails = interaction.fields.getTextInputValue('issue_details');
 
+        logInfo('Modal inputs received successfully.');
+
+        // Determine the issue tag
         const tagNames = {
             submit_general_ticket: 'General Issue',
             submit_iron_ticket: 'IRON Issue',
@@ -161,6 +165,9 @@ async function handleModalSubmission(interaction) {
 
         const issueTag = tagNames[interaction.customId] || 'Unknown Issue';
 
+        logInfo(`Issue tag determined: ${issueTag}`);
+
+        // Load ticket settings
         const ticketSettings = loadTicketSettings();
         const ticketCategory = ticketSettings.categoryId;
         const ticketRole = ticketSettings.roleId;
@@ -169,6 +176,12 @@ async function handleModalSubmission(interaction) {
             throw new Error('Role ID is not defined in ticketSettings.json.');
         }
 
+        logInfo('Ticket settings loaded successfully.');
+
+        // Fetch the member (server nickname)
+        const member = await interaction.guild.members.fetch(interaction.user.id);
+
+        // Generate ticket channel name
         const ticketCounter = ticketSettings.ticketCounter || 1;
         const ticketChannelName = `${String(ticketCounter).padStart(3, '0')}-${interaction.user.username}-ticket`;
 
@@ -179,6 +192,8 @@ async function handleModalSubmission(interaction) {
         if (!supportRole) {
             throw new Error(`Role with ID ${ticketRole} not found in guild.`);
         }
+
+        logInfo('Support role fetched successfully.');
 
         // Create a new channel
         const channel = await guild.channels.create({
@@ -218,8 +233,9 @@ async function handleModalSubmission(interaction) {
             ],
         });
 
-        logInfo(`Ticket created for ${interaction.user.tag}: ${channel.name}`);
+        logInfo(`Ticket channel created: ${channel.name}`);
 
+        // Action buttons
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('close_ticket')
@@ -235,14 +251,36 @@ async function handleModalSubmission(interaction) {
                 .setStyle(ButtonStyle.Secondary)
         );
 
+        // Generate submission embed
+        const embed = generateSubmissionEmbed({
+            user: member.displayName, // Use server nickname
+            nickname: member.displayName,
+            timestamp: Math.floor(Date.now() / 1000),
+            tag: issueTag,
+            issueType,
+            details: issueDetails,
+        });
+
+        // Notify the user with an @mention
         await channel.send({
-            content: `<@${interaction.user.id}> Your ticket has been created. Please describe your issue.\n\n**Type of Issue:** ${issueType}\n**Details:** ${issueDetails}\n**Tag:** ${issueTag}`,
+            content: `<@${interaction.user.id}> Your ticket has been created. Please provide any additional details.`,
+            embeds: [embed],
             components: [row],
         });
 
-        // Increment and save ticketCounter
+        logInfo('Submission embed sent successfully.');
+
+        if (issueTag === 'Player Issue') {
+            await channel.send({
+                content: `To associate this ticket with a specific player, please use the \`/assignmember\` command and select the player involved in this issue.\nIf the selected player is part of the moderation team, they will automatically be removed from the associated chat.`,
+            });
+        }
+
+        // Increment ticketCounter and save settings
         ticketSettings.ticketCounter = ticketCounter + 1;
         saveTicketSettings(ticketSettings);
+
+        logInfo('Ticket counter incremented and settings saved.');
 
         await interaction.reply({
             content: `Your ticket has been created in ${channel}.`,
@@ -250,10 +288,12 @@ async function handleModalSubmission(interaction) {
         });
     } catch (error) {
         logError(`Failed to handle modal submission: ${error.message}`);
-        await interaction.reply({ content: 'An error occurred while processing your ticket.', ephemeral: true });
+        await interaction.reply({
+            content: `An error occurred while processing your ticket: ${error.message}`,
+            ephemeral: true,
+        });
     }
 }
-
 
 // Close Ticket Button
 async function closeTicket(interaction) {
@@ -294,19 +334,32 @@ async function reopenTicket(interaction) {
     try {
         const channel = interaction.channel;
 
+        // Allow the user to send messages again
         await channel.permissionOverwrites.edit(interaction.user.id, {
             SendMessages: true,
         });
 
-        const now = Math.floor(Date.now() / 1000); // Current timestamp in seconds
-        logInfo(`Ticket reopened: ${channel.name} by ${interaction.user.tag} at ${new Date().toISOString()}`);
+        const settings = loadTicketSettings();
+
+        // Remove ticket from closedTickets if it exists
+        settings.closedTickets = settings.closedTickets.filter(
+            ticket => ticket.channelId !== channel.id
+        );
+        saveTicketSettings(settings);
+
+        const now = Math.floor(Date.now() / 1000);
+        logInfo(`Ticket reopened: ${channel.name} by ${interaction.user.tag} at <t:${now}:F>`);
 
         await interaction.reply({
-            content: `Ticket reopened by <@${interaction.user.id}> at <t:${now}:F>. Please provide any additional details.`,
+            content: `Ticket reopened by <@${interaction.user.id}> at <t:${now}:F>.`,
+            ephemeral: false,
         });
     } catch (error) {
         logError(`Failed to reopen ticket: ${error.message}`);
-        await interaction.reply({ content: 'An error occurred while reopening the ticket.', ephemeral: true });
+        await interaction.reply({
+            content: 'An error occurred while reopening the ticket.',
+            ephemeral: true,
+        });
     }
 }
 
@@ -326,28 +379,34 @@ async function deleteTicket(interaction) {
 }
 
 async function showCloseTicketModal(interaction) {
-    const modal = new ModalBuilder()
-        .setCustomId('close_ticket_modal')
-        .setTitle('Close Ticket');
+    try {
+        const modal = new ModalBuilder()
+            .setCustomId('close_ticket_modal')
+            .setTitle('Close Ticket');
 
-    const resolvedInput = new TextInputBuilder()
-        .setCustomId('resolved')
-        .setLabel('Was the issue resolved? (Yes/No)')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
+        const resolvedInput = new TextInputBuilder()
+            .setCustomId('resolved')
+            .setLabel('Was the issue resolved? (Yes/No)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
 
-    const summaryInput = new TextInputBuilder()
-        .setCustomId('summary')
-        .setLabel('Summary of the issue')
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true);
+        const summaryInput = new TextInputBuilder()
+            .setCustomId('summary')
+            .setLabel('Summary of the issue')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
 
-    modal.addComponents(
-        new ActionRowBuilder().addComponents(resolvedInput),
-        new ActionRowBuilder().addComponents(summaryInput)
-    );
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(resolvedInput),
+            new ActionRowBuilder().addComponents(summaryInput)
+        );
 
-    await interaction.showModal(modal);
+        // Show the modal
+        await interaction.showModal(modal);
+        console.log('Modal displayed successfully.');
+    } catch (error) {
+        console.error(`Error in showCloseTicketModal: ${error.message}`);
+    }
 }
 
 // Show a modal for deleting a ticket.
@@ -381,11 +440,31 @@ async function handleCloseTicketSubmission(interaction) {
     try {
         const resolved = interaction.fields.getTextInputValue('resolved');
         const summary = interaction.fields.getTextInputValue('summary');
+        const logPlayer = interaction.channel.name.includes('player_issue')
+            ? interaction.fields.getTextInputValue('log_player')
+            : null;
+        const timestamp = Math.floor(Date.now() / 1000);
 
-        await interaction.channel.send({
-            content: `<@${interaction.user.id}> closed this ticket.\n**Resolved:** ${resolved}\n**Summary:** ${summary}`,
+        const member = await interaction.guild.members.fetch(interaction.user.id);
+
+        // Generate and send the embed
+        const embed = generateClosureEmbed({
+            closedBy: member.displayName, // Server nickname
+            nickname: member.displayName,
+            timestamp,
+            resolved,
+            summary,
         });
 
+        const channel = interaction.channel;
+
+        // Process Player Issue logging
+        if (logPlayer && logPlayer.toLowerCase() === 'yes') {
+            logInfo(`Player issue logged for ticket: ${channel.name}`);
+            // Add logic to log the player issue (e.g., save to a database or file)
+        }
+
+        await channel.send({ embeds: [embed] });
         await closeTicket(interaction);
     } catch (error) {
         logError(`Failed to handle close ticket submission: ${error.message}`);
@@ -398,18 +477,31 @@ async function handleDeleteTicketSubmission(interaction) {
     try {
         const resolved = interaction.fields.getTextInputValue('resolved');
         const summary = interaction.fields.getTextInputValue('summary');
+        const logPlayer = interaction.channel.name.includes('player_issue')
+            ? interaction.fields.getTextInputValue('log_player')
+            : null;
 
-        await interaction.channel.send({
-            content: `<@${interaction.user.id}> deleted this ticket.\n**Resolved:** ${resolved}\n**Summary:** ${summary}`,
+        logInfo(`Ticket deleted with details:
+            Resolved: ${resolved}
+            Summary: ${summary}
+            Player Issue: ${logPlayer || 'N/A'}
+            Deleted by: ${interaction.user.tag}`);
+
+        // Log details before deleting the ticket
+        await interaction.reply({
+            content: 'Ticket has been deleted. The response has been logged.',
+            ephemeral: true,
         });
 
         await deleteTicket(interaction);
     } catch (error) {
         logError(`Failed to handle delete ticket submission: ${error.message}`);
-        await interaction.reply({ content: 'An error occurred while deleting the ticket.', ephemeral: true });
+        await interaction.reply({
+            content: 'An error occurred while deleting the ticket.',
+            ephemeral: true,
+        });
     }
 }
-
 
 // Auto delete closed tickets
 function startTicketDeletionInterval(client) {

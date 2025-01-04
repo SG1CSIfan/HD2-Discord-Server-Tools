@@ -11,7 +11,6 @@ const {
     showIssueModal,
     handleModalSubmission,
 } = require('./ticketHandler');
-const { validateSupportRole } = require('../utils/roleUtils');
 const { loadTicketSettings } = require('../utils/fileUtils');
 
 async function handleInteraction(interaction, client) {
@@ -26,7 +25,6 @@ async function handleInteraction(interaction, client) {
 
     try {
         const settings = loadTicketSettings();
-        const requiredRoleId = settings.roleId;
 
         // Handle button interactions
         if (interaction.isButton()) {
@@ -37,16 +35,12 @@ async function handleInteraction(interaction, client) {
 
                 // Close Ticket Button
                 case 'close_ticket':
-                    if (await validateSupportRole(interaction, requiredRoleId)) {
-                        await showCloseTicketModal(interaction);
-                    }
+                    await showCloseTicketModal(interaction);
                     break;
 
                 // Delete Ticket Button
                 case 'delete_ticket':
-                    if (await validateSupportRole(interaction, requiredRoleId)) {
-                        await showDeleteTicketModal(interaction);
-                    }
+                    await showDeleteTicketModal(interaction);
                     break;
 
                 // Reopen Ticket Button
@@ -95,7 +89,28 @@ async function handleInteraction(interaction, client) {
                 return;
             }
 
+            // Ensure `/assignmember` is only usable in ticket channels
+            if (interaction.commandName === 'assignmember') {
+                const ticketCategoryId = settings.categoryId;
+                if (!interaction.channel.parentId || interaction.channel.parentId !== ticketCategoryId) {
+                    await interaction.reply({
+                        content: 'This command can only be used in ticket channels.',
+                        ephemeral: true,
+                    });
+                    return;
+                }
+            }
+
             await command.execute(interaction);
+        }
+
+        // Handle autocomplete interactions
+        if (interaction.isAutocomplete()) {
+            const command = client.commands.get(interaction.commandName);
+            if (command && command.autocomplete) {
+                await command.autocomplete(interaction);
+            }
+            return;
         }
     } catch (error) {
         logError(`Failed to handle interaction: ${error.message}`);
