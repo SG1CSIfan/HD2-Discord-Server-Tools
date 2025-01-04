@@ -1,0 +1,16 @@
+{
+  "name": "hd2-discord-server-tools",
+  "version": "2.0.0",
+  "description": "Helldiver 2 Discord Server Tools and Moderation",
+  "main": "index.js",
+  "scripts": {
+    "test": "ping"
+  },
+  "author": "SG1CSIfan",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.17.2",
+    "dotenv": "^16.4.7",
+    "winston": "^3.17.0"
+  }
+}

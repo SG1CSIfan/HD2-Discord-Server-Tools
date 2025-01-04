@@ -1,0 +1,12 @@
+# Node.js dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Logs
+logs/
+
+# Ignore changes to ticketSettings.json on Mini PC
+!data/ticketSettings.json
+data/ticketSettings.json
