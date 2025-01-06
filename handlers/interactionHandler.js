@@ -11,6 +11,13 @@ const {
     showIssueModal,
     handleModalSubmission,
 } = require('./ticketHandler');
+const { 
+    showPromotionModal, 
+    handlePromotionSubmission, 
+    handlePromotionApproval, 
+    showDenialReasonModal, 
+    handleDenialReasonSubmission 
+} = require('../handlers/promotionHandler');
 const { loadTicketSettings } = require('../utils/fileUtils');
 
 async function handleInteraction(interaction, client) {
@@ -62,20 +69,50 @@ async function handleInteraction(interaction, client) {
                     await showIssueModal(interaction, 'Player');
                     break;
 
+                // Promotion Button, Approval Button, Denied Button
+                case 'promotion_application':
+                    await showPromotionModal(interaction);
+                    break;
+                case 'approve_promotion':
+                    await handlePromotionApproval(interaction);
+                    break;
+                case 'deny_promotion':
+                    await showDenialReasonModal(interaction);
+                    break;
+
                 default:
                     logError(`Unhandled button interaction: ${interaction.customId}`);
             }
             return;
         }
 
-        // Handle modal submissions
+        // Handle modals submissions
         if (interaction.isModalSubmit()) {
-            if (interaction.customId === 'close_ticket_modal') {
-                await handleCloseTicketSubmission(interaction);
-            } else if (interaction.customId === 'delete_ticket_modal') {
-                await handleDeleteTicketSubmission(interaction);
-            } else {
-                await handleModalSubmission(interaction);
+            switch (interaction.customId) {
+                case 'close_ticket_modal':
+                    await handleCloseTicketSubmission(interaction);
+                    break;
+                case 'delete_ticket_modal':
+                    await handleDeleteTicketSubmission(interaction);
+                    break;
+                case 'promotion_application_modal':
+                    await handlePromotionSubmission(interaction); // Handle promotion modal
+                    break;
+                case 'denial_reason_modal':
+                    await handleDenialReasonSubmission(interaction); // Handle denial reason modal
+                    break;
+
+                default:
+                    // Use fallback for ticket-related modals
+                    if (interaction.customId.startsWith('submit_')) {
+                        await handleModalSubmission(interaction);
+                    } else {
+                        logError(`Unhandled modal interaction: ${interaction.customId}`);
+                        await interaction.reply({
+                            content: 'This modal interaction is not recognized.',
+                            flags: 64, // Ephemeral response
+                        });
+                    }
             }
             return;
         }

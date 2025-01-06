@@ -21,7 +21,11 @@ module.exports = {
             new ButtonBuilder()
                 .setCustomId('player_issue')
                 .setLabel('Player Issue')
-                .setStyle(ButtonStyle.Danger)
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId('promotion_application')
+                .setLabel('Promotion')
+                .setStyle(ButtonStyle.Success)    
         );
 
         await interaction.reply({

@@ -35,4 +35,21 @@ function saveTicketSettings(settings) {
     }
 }
 
-module.exports = { loadTicketSettings, saveTicketSettings };
+function loadPromotionSettings() {
+    const settingsPath = path.join(__dirname, '../data/promotionSettings.json');
+
+    try {
+        if (fs.existsSync(settingsPath)) {
+            const settingsData = fs.readFileSync(settingsPath, 'utf-8');
+            return JSON.parse(settingsData);
+        } else {
+            logError(`Promotion settings file not found at ${settingsPath}`);
+            return {};
+        }
+    } catch (error) {
+        logError(`Failed to load promotion settings: ${error.message}`);
+        return {};
+    }
+}
+
+module.exports = { loadTicketSettings, saveTicketSettings, loadPromotionSettings };
