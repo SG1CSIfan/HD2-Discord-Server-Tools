@@ -2,10 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const { logError } = require('../handlers/loggingHandler');
 
+// Load ticket settings
 function loadTicketSettings() {
     const settingsPath = path.join(__dirname, '../data/ticketSettings.json');
 
-    // Default settings
     const defaultSettings = {
         supportEnabled: true,
         ticketExpiryHours: 24,
@@ -35,6 +35,42 @@ function saveTicketSettings(settings) {
     }
 }
 
+// Load MOD Report settings
+function loadModReportSettings() {
+    const settingsPath = path.join(__dirname, '../data/modReportSettings.json');
+
+    const defaultSettings = {
+        mainEmbedChannelId: '',
+        mainEmbedMessageId: '',
+        submissionChannelId: '',
+        operationName: 'Unknown Operation',
+        hostId: '',
+    };
+
+    try {
+        if (!fs.existsSync(settingsPath)) {
+            fs.writeFileSync(settingsPath, JSON.stringify(defaultSettings, null, 2));
+            return defaultSettings;
+        }
+
+        const settingsData = fs.readFileSync(settingsPath, 'utf-8');
+        return JSON.parse(settingsData);
+    } catch (error) {
+        logError(`Failed to load MOD report settings: ${error.message}`);
+        return defaultSettings;
+    }
+}
+
+function saveModReportSettings(settings) {
+    const settingsPath = path.join(__dirname, '../data/modReportSettings.json');
+
+    try {
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    } catch (error) {
+        logError(`Failed to save MOD report settings: ${error.message}`);
+    }
+}
+
 function loadPromotionSettings() {
     const settingsPath = path.join(__dirname, '../data/promotionSettings.json');
 
@@ -52,4 +88,10 @@ function loadPromotionSettings() {
     }
 }
 
-module.exports = { loadTicketSettings, saveTicketSettings, loadPromotionSettings };
+module.exports = {
+    loadTicketSettings,
+    saveTicketSettings,
+    loadModReportSettings,
+    saveModReportSettings,
+    loadPromotionSettings,
+};

@@ -3,10 +3,32 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
  // Generate the support embed and buttons.
 function generateSupportEmbed() {
     const embed = new EmbedBuilder()
-        .setTitle('Support Ticket System')
-        .setDescription('Click a button below to create a support ticket for the relevant issue.')
-        .setColor(0x1f8b4c);
-
+    .setTitle("1st Colonial Regiment - Support | Promotions")
+    .setDescription("Welcome, brave member of the 1st Colonial Regiment! Need assistance?\n\n**Common issues include:**\n__General Issue__ - Any issue outside the below buttons\n__IRON Issue__ - Issue with IRON\n__Bot Issue__ - Issues with one of the Bots (Please provide details and images if possible)\n__Player Issues__ -  Issue with another player\n__Promotion__ - Apply For a promotion.\n\nClick Submit Ticket to reach Command HQ. Your comrades are here to help!")
+    .setColor(0x1f8b4c)
+    .addFields(
+        {
+          name: "**__PROMOTIONS__**",
+          value: "This bot handles applications for the following:",
+          inline: false
+        },
+        {
+          name: "Current Rank",
+          value: "Steward\nDeployment Chief\nDeployment Supreme",
+          inline: true
+        },
+        {
+          name: "Next Rank",
+          value: "Deployment Officer\nDeployment Supreme\nFreedom Captain",
+          inline: true
+        },
+        {
+          name: "IRON Needed",
+          value: "[ V ] (5 IRON)\n[ X ] (10 IRON)\n[ X ] (10 IRON)",
+          inline: true
+        },
+      )
+      
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('general_issue')
