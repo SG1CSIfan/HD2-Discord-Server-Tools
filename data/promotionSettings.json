@@ -2,26 +2,26 @@
         "applicationChannelId": "1314958607372259338",
         "summaryChannelId": "1314958607372259338",          
         "approvalRoleId": "1292637359501742080",
-        "manageableRanks": ["Steward", "Deployment Supreme", "Freedom Captain"],              
+        "manageableRanks": ["Steward", "Deployment Supreme", "Deployment Chief", "Freedom Captain"],              
         "ranks": {
             "Steward": {
                 "roleId": "1314941817820676126",
                 "casteRoleId": "1315330386884300800",
-                "requiredIRON": 5,
+                "requiredIRON": 4,
                 "nextRank": "Deployment Officer",
                 "emoji": "<:rankSteward:1323092582594777108>"
             },
             "Deployment Officer": {
                 "roleId": "1314941894438158387",
                 "casteRoleId": "1315334516109479987",
-                "requiredIRON": 8,
+                "requiredIRON": 5,
                 "nextRank": "Deployment Chief",
                 "emoji": "<:rankDeploymentOfficer:1323092770348339332>"
             },
             "Deployment Chief": {
                 "roleId": "1314941957465964554",
                 "casteRoleId": "1315334516109479987",
-                "requiredIRON": 10,
+                "requiredIRON": 8,
                 "nextRank": "Deployment Supreme",
                 "emoji": "<:rankDeploymentChief:1323092855484317778>"
             },

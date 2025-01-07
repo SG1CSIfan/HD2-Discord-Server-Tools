@@ -1,6 +1,9 @@
 {
-    "Deployment Officer": "As a Deployment Officer, you are responsible for...",
-    "Deployment Chief": "As a Deployment Chief, your duties include...",
-    "Deployment Supreme": "Congratulations on achieving Deployment Supreme...",
-    "Freedom Captain": "Welcome to the Freedom Captain rank! Your leadership is crucial..."
+    "Steward": "Congratulations on becoming a Steward!\n\nEntering the 3rd stage of 1st Colonial Operation, we need new leaders and contributors to the greater entity that serves Super Earth and her colonies. If you choose to remain a Steward, you will still accrue IRON for your participation but will not progress further up the Chain of Command.\n\n**Part of your new responsibilities:**\n\n- Help maintain the standards of the 1st Colonial Regiment\n- Support and guide new recruits\n- Step in during MODs if there is a shortage of Deployment Caste and lead a team\n\nTo earn the next rank, achieve IRON [ V ] (5 IRON) to become eligible for Deployment Officer.",
+    
+    "Deployment Officer": "Congratulations on becoming a Deployment Officer!\n\nPlease read through the information in **#deployment-materials** for a comprehensive list of responsibilities.\n\n**Your new responsibilities include:**\n\n- Hosting Major Order MODs\n- Encouraging activity within the Discord server\n- Filing reports during MODs using **#submit-mod-report**",
+    
+    "Deployment Supreme": "Welcome to Deployment Supreme! Your leadership plays a critical role in the success of the 1CR.\n\nPlease speak with a Fleet Commander about receiving training to run small events within your company.\n\n**Your new opportunities include:**\n\n- Hosting small events\n\nYou are one step closer to achieving the rank of Freedom Captain!",
+    
+    "Freedom Captain": "Congratulations on becoming a Freedom Captain!\n\nAs one of the highest-ranking leaders in the 1CR, please contact High Command or the IRON Commission to receive training for your new responsibilities.\n\n**Your new duties include:**\n\n- Hosting MODs\n- Overseeing application onboarding\n- Answering support tickets\n- Supervising and guiding the regiment"
 }

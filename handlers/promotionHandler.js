@@ -1,14 +1,16 @@
 const { loadPromotionSettings } = require('../utils/fileUtils');
-const { parseIRON, romanToDecimal, getEligibleRank } = require('../utils/ironUtils');
+const { parseIRON, getEligibleRank } = require('../utils/ironUtils');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder} = require('discord.js');
 const {
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    ModalBuilder,
-    TextInputBuilder,
-    TextInputStyle,
-} = require('discord.js');
+    generateApplicationEmbed,
+    generateDenialEmbed,
+    generateStewardEmbed,
+    generateDeploymentOfficerEmbed,
+    generateDeploymentSupremeEmbed,
+    generateFreedomCaptainEmbed,
+    generateApprovalEmbed
+} = require('../embedHandlers/promotionEmbed');
+const path = require('path');
 
 async function showPromotionModal(interaction) {
     const modal = new ModalBuilder()
@@ -42,72 +44,6 @@ async function showPromotionModal(interaction) {
     await interaction.showModal(modal);
 }
 
-async function processPromotion(interaction, approved) {
-    const settings = loadPromotionSettings();
-    const member = await interaction.guild.members.fetch(interaction.user.id);
-    const currentIRON = parseIRON(member.displayName);
-    const eligibleRank = getEligibleRank(currentIRON, member.roles.cache.map(role => role.id), settings.ranks);
-
-    if (!eligibleRank) {
-        await interaction.reply({ content: 'You do not meet the requirements for promotion.', flags: 64 });
-        return;
-    }
-
-    if (approved) {
-        const { roleId, casteRoleId, nextRank } = eligibleRank;
-
-        // Remove current roles
-        await member.roles.remove([roleId, casteRoleId]);
-
-        // Add new roles
-        const nextRoleData = settings.ranks[nextRank];
-        if (nextRoleData) {
-            await member.roles.add([nextRoleData.roleId, nextRoleData.casteRoleId]);
-
-            // Send confirmation embed
-            const promotionEmbed = new EmbedBuilder()
-                .setTitle('Promotion Approved')
-                .setColor(0x1f8b4c)
-                .setDescription(`${member.displayName} has been promoted to **${nextRank}**! Congratulations!`);
-
-            await interaction.channel.send({ embeds: [promotionEmbed] });
-        }
-    } else {
-        await handleDenial(interaction);
-    }
-}
-
-async function handleDenial(interaction) {
-    const modal = new ModalBuilder()
-        .setCustomId('denial_reason_modal') // Matches the handler in interactionHandler.js
-        .setTitle('Promotion Denial Reason');
-
-    const reasonInput = new TextInputBuilder()
-        .setCustomId('denial_reason') // Matches the retrieval in handleDenialReasonSubmission
-        .setLabel('Reason for Denial')
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
-    await interaction.showModal(modal);
-}
-
-async function finalizeDenial(interaction) {
-    const reason = interaction.fields.getTextInputValue('reason');
-    const member = await interaction.guild.members.fetch(interaction.user.id);
-
-    const denialEmbed = new EmbedBuilder()
-        .setTitle('Promotion Denied')
-        .setColor(0xff0000)
-        .setDescription(
-            `${member.displayName}, your promotion application was denied.`
-        )
-        .addFields({ name: 'Reason', value: reason });
-
-    await member.send({ embeds: [denialEmbed] });
-    await interaction.reply({ content: 'Denial reason sent to the applicant.', ephemeral: true });
-}
-
 async function handlePromotionSubmission(interaction) {
     try {
         const reason = interaction.fields.getTextInputValue('reason');
@@ -115,25 +51,13 @@ async function handlePromotionSubmission(interaction) {
         const leader = interaction.fields.getTextInputValue('leader');
         const member = await interaction.guild.members.fetch(interaction.user.id);
 
-        console.log(`Promotion Application: ${member.displayName} | Reason: ${reason} | Contributions: ${contributions} | Leader: ${leader}`);
-
-        // Load promotion settings
         const settings = loadPromotionSettings();
-        console.log('Loaded promotion settings:', settings);
-
-        // Parse IRON level
         const currentIRON = parseIRON(member.displayName);
-        console.log(`Current IRON: ${currentIRON}`);
-
-        // Find user's current rank by matching roles with rank IDs
         const currentRoles = member.roles.cache.map(role => role.id);
         const currentRank = Object.keys(settings.ranks).find(rankName =>
             currentRoles.includes(settings.ranks[rankName].roleId)
         );
 
-        console.log('Current Rank:', currentRank);
-
-        // Ensure the current rank is manageable by this bot
         if (!settings.manageableRanks.includes(currentRank)) {
             await interaction.reply({
                 content: `Applications for the rank **${currentRank}** are not handled by this bot.`,
@@ -142,10 +66,7 @@ async function handlePromotionSubmission(interaction) {
             return;
         }
 
-        // Validate eligible rank
         const eligibleRank = getEligibleRank(currentIRON, currentRoles, settings.ranks);
-        console.log('Eligible Rank:', eligibleRank);
-
         if (!eligibleRank) {
             await interaction.reply({
                 content: 'You do not meet the requirements for the next rank. Ensure you have enough IRON and are progressing in the correct order.',
@@ -154,30 +75,18 @@ async function handlePromotionSubmission(interaction) {
             return;
         }
 
-        // Format joined date in Discord's timestamp format
         const joinedDate = `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>`;
-
-        // Create and send promotion application embed
-        const applicationEmbed = new EmbedBuilder()
-            .setTitle(`${member.displayName} applied for a Promotion`)
-            .setColor(0x1f8b4c)
-            .setDescription(`Joined 1CR: ${joinedDate}`)
-            .addFields(
-                { name: 'IRON Level', value: `[ ${currentIRON} ] (${romanToDecimal(currentIRON)} IRON)`, inline: true },
-                {
-                    name: 'Current Rank',
-                    value: `${settings.ranks[currentRank].emoji || ''} ${currentRank}`,
-                    inline: true,
-                },
-                {
-                    name: 'Eligible Rank',
-                    value: `${settings.ranks[eligibleRank.nextRank]?.emoji || ''} ${eligibleRank.nextRank || 'N/A'}`,
-                    inline: true,
-                },
-                { name: 'Reason for Promotion', value: reason, inline: false },
-                { name: 'Recent Contributions', value: contributions, inline: false },
-                { name: 'Leader Response', value: leader, inline: false }
-            );
+        const applicationEmbed = generateApplicationEmbed(
+            member,
+            currentIRON,
+            currentRank,
+            eligibleRank,
+            joinedDate,
+            reason,
+            contributions,
+            leader,
+            settings
+        );
 
         const buttons = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -206,13 +115,9 @@ async function handlePromotionSubmission(interaction) {
 async function handlePromotionApproval(interaction) {
     const settings = loadPromotionSettings();
     const approver = interaction.member;
-    const approverRole = settings.approvalRoleId;
 
-    if (!approver.roles.cache.has(approverRole)) {
-        await interaction.reply({
-            content: 'You do not have permission to approve promotions.',
-            flags: 64, // Ephemeral response
-        });
+    if (!approver.roles.cache.has(settings.approvalRoleId)) {
+        await interaction.reply({ content: 'You do not have permission to approve promotions.', ephemeral: true });
         return;
     }
 
@@ -221,39 +126,57 @@ async function handlePromotionApproval(interaction) {
     const eligibleRankField = embed.fields.find(f => f.name === 'Eligible Rank');
 
     if (!currentRankField || !eligibleRankField) {
-        console.error('Current or Eligible Rank fields are missing in the embed:', embed.fields);
         throw new Error('Current or Eligible Rank fields are missing.');
     }
 
-    const currentRankName = currentRankField.value.split(' ').slice(1).join(' '); // Handle emojis in rank names
-    const nextRankName = eligibleRankField.value.split(' ').slice(1).join(' ');   // Handle emojis in rank names
+    const currentRankName = currentRankField.value.split(' ').slice(1).join(' ');
+    const nextRankName = eligibleRankField.value.split(' ').slice(1).join(' ');
 
     const currentRankData = settings.ranks[currentRankName];
     const nextRankData = settings.ranks[nextRankName];
 
     if (!currentRankData || !nextRankData) {
-        console.error('Rank data for current or next rank is undefined:', {
-            currentRankName,
-            nextRankName,
-            currentRankData,
-            nextRankData,
-        });
         throw new Error('Rank data for current or next rank is undefined.');
     }
 
     const member = interaction.guild.members.cache.find(m => m.displayName.includes(embed.title.split(' ')[1]));
     if (!member) {
-        await interaction.reply({
-            content: 'Could not find the user being promoted.',
-            flags: 64,
-        });
+        await interaction.reply({ content: 'Could not find the user being promoted.', ephemeral: true });
         return;
     }
 
-    await member.roles.remove(currentRankData.roleId);
-    await member.roles.remove(currentRankData.casteRoleId);
-    await member.roles.add(nextRankData.roleId);
-    await member.roles.add(nextRankData.casteRoleId);
+    try {
+        await member.roles.remove(currentRankData.roleId);
+        await member.roles.remove(currentRankData.casteRoleId);
+        await member.roles.add(nextRankData.roleId);
+        await member.roles.add(nextRankData.casteRoleId);
+    } catch (error) {
+        console.error(`Failed to update roles for ${member.displayName}: ${error.message}`);
+    }
+
+    let dmEmbed;
+    switch (nextRankName) {
+        case 'Steward':
+            dmEmbed = generateStewardEmbed(member, approver);
+            break;
+        case 'Deployment Officer':
+            dmEmbed = generateDeploymentOfficerEmbed(member, approver);
+            break;
+        case 'Deployment Supreme':
+            dmEmbed = generateDeploymentSupremeEmbed(member, approver);
+            break;
+        case 'Freedom Captain':
+            dmEmbed = generateFreedomCaptainEmbed(member, approver);
+            break;
+        default:
+            dmEmbed = generateApprovalEmbed(member.displayName, nextRankName, approver.displayName);
+    }
+
+    try {
+        await member.send({ embeds: [dmEmbed] });
+    } catch (error) {
+        console.error(`Failed to send DM to ${member.displayName}: ${error.message}`);
+    }
 
     const updatedEmbed = EmbedBuilder.from(embed)
         .addFields(
@@ -263,39 +186,43 @@ async function handlePromotionApproval(interaction) {
         .setColor(0x1f8b4c);
 
     await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
+    await interaction.reply({ content: `Promotion for ${member.displayName} to ${nextRankName} has been approved.`, ephemeral: true });
+}
+
+async function handleDenialReasonSubmission(interaction) {
+    const reason = interaction.fields.getTextInputValue('denial_reason');
+    const embed = interaction.message.embeds[0];
+    const member = interaction.guild.members.cache.find(m => m.displayName.includes(embed.title.split(' ')[1]));
+    const approver = interaction.member;
+
+    if (!member) {
+        await interaction.reply({ content: 'Could not find the user being denied.', ephemeral: true });
+        return;
+    }
+
+    const updatedEmbed = generateDenialEmbed(member.displayName, reason, approver.displayName);
+
+    await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
+
+    try {
+        await member.send({ embeds: [updatedEmbed] });
+    } catch {
+        console.error(`Failed to send DM to ${member.displayName}`);
+    }
 
     await interaction.reply({
-        content: `Promotion for ${member.displayName} to ${nextRankName} has been approved.`,
-        flags: 64,
+        content: `Promotion for ${member.displayName} has been denied.`,
+        ephemeral: true,
     });
-
-    // Create DM Embed
-    const dmEmbed = new EmbedBuilder()
-        .setTitle('🎉 Congratulations on Your Promotion! 🎉')
-        .setColor(0x1f8b4c)
-        .setDescription(`You have been promoted to **${nextRankName}** in the 1CR!`)
-        .addFields(
-            { name: 'New Responsibilities', value: settings.ranks[nextRankName]?.responsibilities || 'Details about your new rank.', inline: false },
-            { name: 'Approved By', value: approver.displayName, inline: true },
-            { name: 'Date of Promotion', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
-        )
-        .setFooter({ text: 'We look forward to your continued contributions to the 1CR!' });
-
-    // Send DM to the promoted user
-    try {
-        await member.send({ embeds: [dmEmbed] });
-    } catch (error) {
-        console.error(`Failed to send DM to ${member.displayName}: ${error.message}`);
-    }
 }
 
 async function showDenialReasonModal(interaction) {
     const modal = new ModalBuilder()
-        .setCustomId('denial_reason_modal') // This must match the handler in interactionHandler.js
+        .setCustomId('denial_reason_modal')
         .setTitle('Promotion Denial Reason');
 
     const reasonInput = new TextInputBuilder()
-        .setCustomId('denial_reason') // Matches the retrieval in handleDenialReasonSubmission
+        .setCustomId('denial_reason')
         .setLabel('Reason for Denial')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(true);
@@ -304,59 +231,10 @@ async function showDenialReasonModal(interaction) {
     await interaction.showModal(modal);
 }
 
-async function handleDenialReasonSubmission(interaction) {
-    // Log all fields for debugging
-    console.log('Modal Fields:', interaction.fields.fields);
-
-    const reason = interaction.fields.getTextInputValue('denial_reason'); // Matches the modal's customId
-    const embed = interaction.message.embeds[0];
-    const userTag = embed.title.match(/\[ (.+?) \]/)[1];
-    const member = interaction.guild.members.cache.find(m => m.displayName.includes(userTag));
-    const approver = interaction.member;
-
-    if (!member) {
-        await interaction.reply({ content: 'Could not find the user being denied.', flags: 64 });
-        return;
-    }
-
-    const updatedEmbed = EmbedBuilder.from(embed)
-        .addFields(
-            { name: 'Denied By', value: approver.displayName, inline: true },
-            { name: 'Date Denied', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
-            { name: 'Reason for Denial', value: reason, inline: false }
-        )
-        .setColor(0xff0000);
-
-    await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
-
-    const denialEmbed = new EmbedBuilder()
-        .setTitle('Promotion Denied')
-        .setColor(0xff0000)
-        .setDescription(
-            `${member.displayName}, your promotion application was denied.\n\n**Reason:** ${reason}`
-        )
-        .addFields({ name: 'Denied By', value: approver.displayName, inline: true });
-
-    try {
-        await member.send({ embeds: [denialEmbed] });
-    } catch {
-        console.error(`Failed to send DM to ${member.displayName}`);
-    }
-
-    await interaction.reply({
-        content: `Promotion for ${member.displayName} has been denied.`,
-        flags: 64,
-    });
-}
-
-
 module.exports = {
     showPromotionModal,
     handlePromotionSubmission,
-    processPromotion,
-    handleDenial,
-    finalizeDenial,
     handlePromotionApproval,
-    showDenialReasonModal,
     handleDenialReasonSubmission,
+    showDenialReasonModal,
 };
