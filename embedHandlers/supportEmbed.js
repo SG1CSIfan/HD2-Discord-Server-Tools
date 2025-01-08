@@ -64,7 +64,7 @@ function generateSubmissionEmbed(data) {
         .setDescription('A new ticket has been submitted.')
         .setColor(0x1f8b4c)
         .addFields(
-            { name: 'User', value: data.user, inline: true },
+            { name: 'User', value: `${data.nickname}`, inline: true },
             { name: 'Date & Time', value: `<t:${data.timestamp}:F>`, inline: true },
             { name: 'Tag', value: data.tag, inline: false },
             { name: 'Type of Issue', value: data.issueType, inline: false },
@@ -92,8 +92,8 @@ function generateClosureEmbed(data) {
         .addFields(
             { name: 'Closed By', value: data.closedBy, inline: true },
             { name: 'Date & Time', value: `<t:${data.timestamp}:F>`, inline: true },
-            { name: 'Resolved', value: data.resolved, inline: false },
-            { name: 'Summary', value: data.summary || 'No summary provided.', inline: false }
+            { name: 'Resolved Y/N', value: data.resolved, inline: false },
+            { name: 'Summary of Ticket', value: data.summary || 'No summary provided.', inline: false }
         );
 }
 

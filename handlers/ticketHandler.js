@@ -2,8 +2,10 @@ const { PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, Modal
 const { loadTicketSettings, saveTicketSettings } = require('../utils/fileUtils');
 const { generateSupportEmbed, generateSubmissionEmbed, generateClosureEmbed } = require('../embedHandlers/supportEmbed');
 const { logInfo, logError } = require('./loggingHandler');
+const pool = require('../utils/dbUtils'); // Ensure the correct path
 const fs = require('fs');
 const path = require('path');
+const mysql = require('mysql2/promise');
 
 // Setup or update the support embed in the configured channel.
 async function setupSupportInfo(client) {
@@ -25,14 +27,18 @@ async function setupSupportInfo(client) {
         const { embed, row } = generateSupportEmbed();
 
         if (settings.messageId) {
-            const message = await channel.messages.fetch(settings.messageId);
+            const message = await channel.messages.fetch(settings.messageId).catch(() => null);
             if (message) {
+                // Update the existing embed
                 await message.edit({ embeds: [embed], components: [row] });
                 logInfo('Support embed updated.');
                 return;
+            } else {
+                logInfo('Embed not found; creating a new one.');
             }
         }
 
+        // If message doesn't exist, post a new embed
         const sentMessage = await channel.send({ embeds: [embed], components: [row] });
         settings.messageId = sentMessage.id;
         saveTicketSettings(settings);
@@ -164,30 +170,26 @@ async function handleModalSubmission(interaction) {
         };
 
         const issueTag = tagNames[interaction.customId] || 'Unknown Issue';
-
         logInfo(`Issue tag determined: ${issueTag}`);
 
         // Load ticket settings
         const ticketSettings = loadTicketSettings();
-        const ticketCategory = ticketSettings.categoryId;
-        const ticketRole = ticketSettings.roleId;
-
-        if (!ticketRole) {
-            throw new Error('Role ID is not defined in ticketSettings.json.');
-        }
-
-        logInfo('Ticket settings loaded successfully.');
-
-        // Fetch the member (server nickname)
-        const member = await interaction.guild.members.fetch(interaction.user.id);
-
-        // Generate ticket channel name
         const ticketCounter = ticketSettings.ticketCounter || 1;
+        const ticketId = `ticket_${ticketCounter}`;
         const ticketChannelName = `${String(ticketCounter).padStart(3, '0')}-${interaction.user.username}-ticket`;
 
         const guild = interaction.guild;
 
+        // Fetch the member's server nickname
+        const member = await guild.members.fetch(interaction.user.id);
+        const nickname = member.displayName || interaction.user.username;
+
         // Fetch role from guild
+        const ticketRole = ticketSettings.roleId;
+        if (!ticketRole) {
+            throw new Error('Role ID is not defined in ticketSettings.json.');
+        }
+
         const supportRole = guild.roles.cache.get(ticketRole);
         if (!supportRole) {
             throw new Error(`Role with ID ${ticketRole} not found in guild.`);
@@ -195,88 +197,73 @@ async function handleModalSubmission(interaction) {
 
         logInfo('Support role fetched successfully.');
 
-        // Create a new channel
+        // Create a new ticket channel
         const channel = await guild.channels.create({
             name: ticketChannelName,
-            type: 0, // Text channel
-            parent: ticketCategory,
+            type: 0,
+            parent: ticketSettings.categoryId,
             permissionOverwrites: [
-                {
-                    id: guild.roles.everyone.id,
-                    deny: [PermissionsBitField.Flags.ViewChannel],
-                },
-                {
-                    id: interaction.user.id,
-                    allow: [
-                        PermissionsBitField.Flags.ViewChannel,
-                        PermissionsBitField.Flags.SendMessages,
-                        PermissionsBitField.Flags.ReadMessageHistory,
-                    ],
-                },
-                {
-                    id: supportRole.id,
-                    allow: [
-                        PermissionsBitField.Flags.ViewChannel,
-                        PermissionsBitField.Flags.SendMessages,
-                        PermissionsBitField.Flags.ReadMessageHistory,
-                    ],
-                },
-                {
-                    id: interaction.client.user.id,
-                    allow: [
-                        PermissionsBitField.Flags.ViewChannel,
-                        PermissionsBitField.Flags.ManageChannels,
-                        PermissionsBitField.Flags.SendMessages,
-                        PermissionsBitField.Flags.EmbedLinks,
-                    ],
-                },
+                { id: guild.roles.everyone.id, deny: ['ViewChannel'] },
+                { id: interaction.user.id, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] },
+                { id: supportRole.id, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] },
+                { id: interaction.client.user.id, allow: ['ViewChannel', 'ManageChannels', 'SendMessages', 'EmbedLinks'] },
             ],
         });
 
         logInfo(`Ticket channel created: ${channel.name}`);
 
-        // Action buttons
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('close_ticket')
-                .setLabel('Close Ticket')
-                .setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-                .setCustomId('reopen_ticket')
-                .setLabel('Reopen Ticket')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setCustomId('delete_ticket')
-                .setLabel('Delete Ticket')
-                .setStyle(ButtonStyle.Secondary)
-        );
+        // Save ticket data to JSON
+        const ticketData = {
+            ticket_id: ticketId,
+            channel_id: channel.id,
+            user_id: interaction.user.id,
+            user_nickname: nickname,
+            issue_type: issueType,
+            details: issueDetails,
+            tag: issueTag,
+            created_at: new Date().toISOString(),
+            messages: [], // Placeholder for future message logging
+            closed: false,
+        };
 
-        // Generate submission embed
+        const ticketsPath = path.join(__dirname, '../data/tickets.json');
+        const tickets = fs.existsSync(ticketsPath) ? JSON.parse(fs.readFileSync(ticketsPath)) : [];
+        tickets.push(ticketData);
+        fs.writeFileSync(ticketsPath, JSON.stringify(tickets, null, 4));
+
+        logInfo(`Ticket created and saved to JSON: ${JSON.stringify(ticketData)}`);
+
+        // Generate the submission embed
         const embed = generateSubmissionEmbed({
-            user: member.displayName, // Use server nickname
-            nickname: member.displayName,
-            timestamp: Math.floor(Date.now() / 1000),
+            user: interaction.user.username,
+            nickname,
             tag: issueTag,
             issueType,
             details: issueDetails,
+            timestamp: Math.floor(Date.now() / 1000),
         });
 
-        // Notify the user with an @mention
+        // Create action buttons
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('close_ticket').setLabel('Close Ticket').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId('reopen_ticket').setLabel('Reopen Ticket').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('delete_ticket').setLabel('Delete Ticket').setStyle(ButtonStyle.Secondary)
+        );
+
+        // Notify the user and provide ticket details
         await channel.send({
-            content: `<@${interaction.user.id}> Your ticket has been created. Please provide any additional details.`,
+            content: `<@&${supportRole.id}> A new ticket has been created by <@${interaction.user.id}>. Please assist.`,
             embeds: [embed],
             components: [row],
         });
 
-        logInfo('Submission embed sent successfully.');
-
         if (issueTag === 'Player Issue') {
             await channel.send({
-                content: `To associate this ticket with a specific player, please use the \`/assignmember\` command and select the player involved in this issue.\nIf the selected player is part of the moderation team, they will automatically be removed from the associated chat.`,
+                content: `To associate this ticket with a specific player, please use the \`/assignmember\` command.`,
             });
         }
 
-        // Increment ticketCounter and save settings
+        // Increment ticket counter and save settings
         ticketSettings.ticketCounter = ticketCounter + 1;
         saveTicketSettings(ticketSettings);
 
@@ -289,7 +276,7 @@ async function handleModalSubmission(interaction) {
     } catch (error) {
         logError(`Failed to handle modal submission: ${error.message}`);
         await interaction.reply({
-            content: `An error occurred while processing your ticket: ${error.message}`,
+            content: `An error occurred while p rocessing your ticket: ${error.message}`,
             ephemeral: true,
         });
     }
@@ -299,7 +286,6 @@ async function handleModalSubmission(interaction) {
 async function closeTicket(interaction) {
     try {
         const channel = interaction.channel;
-
         await channel.permissionOverwrites.edit(interaction.user.id, {
             SendMessages: false,
         });
@@ -307,7 +293,6 @@ async function closeTicket(interaction) {
         const settings = loadTicketSettings();
         const now = Math.floor(Date.now() / 1000);
 
-        // Prevent duplicate entries in closedTickets
         settings.closedTickets = settings.closedTickets || [];
         if (!settings.closedTickets.some(ticket => ticket.channelId === channel.id)) {
             settings.closedTickets.push({
@@ -317,7 +302,6 @@ async function closeTicket(interaction) {
         }
 
         saveTicketSettings(settings);
-
         logInfo(`Ticket closed: ${channel.name} by ${interaction.user.tag} at ${new Date(now * 1000).toISOString()}`);
 
         await interaction.reply({
@@ -435,40 +419,104 @@ async function showDeleteTicketModal(interaction) {
     await interaction.showModal(modal);
 }
 
+// Format time for Close message
+function formatDuration(durationInSeconds) {
+    if (durationInSeconds >= 86400) {
+        const days = Math.floor(durationInSeconds / 86400);
+        return `${days} day${days > 1 ? 's' : ''}`;
+    } else if (durationInSeconds >= 3600) {
+        const hours = Math.floor(durationInSeconds / 3600);
+        return `${hours} hour${hours > 1 ? 's' : ''}`;
+    } else if (durationInSeconds >= 60) {
+        const minutes = Math.floor(durationInSeconds / 60);
+        return `${minutes} minute${minutes > 1 ? 's' : ''}`;
+    } else {
+        return `${durationInSeconds} second${durationInSeconds > 1 ? 's' : ''}`;
+    }
+}
+
 // Handle submission of the close ticket modal.
 async function handleCloseTicketSubmission(interaction) {
     try {
+        // Retrieve modal inputs
         const resolved = interaction.fields.getTextInputValue('resolved');
         const summary = interaction.fields.getTextInputValue('summary');
-        const logPlayer = interaction.channel.name.includes('player_issue')
-            ? interaction.fields.getTextInputValue('log_player')
-            : null;
-        const timestamp = Math.floor(Date.now() / 1000);
 
+        logInfo('Modal inputs for ticket closure received successfully.');
+
+        // Fetch the member's server nickname
         const member = await interaction.guild.members.fetch(interaction.user.id);
+        const nickname = member.displayName || interaction.user.username;
 
-        // Generate and send the embed
+        // Record the current timestamp
+        const now = new Date().toISOString();
+
+        // Record the closing details
+        const closingDetails = {
+            closed_at: now,
+            closed_by: {
+                user_id: interaction.user.id,
+                user_nickname: nickname,
+            },
+            resolved,
+            summary,
+        };
+
+        // Update the ticket in tickets.json
+        const ticketsPath = path.join(__dirname, '../data/tickets.json');
+        const tickets = fs.existsSync(ticketsPath) ? JSON.parse(fs.readFileSync(ticketsPath)) : [];
+        const ticket = tickets.find(t => t.channel_id === interaction.channel.id);
+
+        if (ticket) {
+            ticket.closed = true;
+            ticket.closing_details = closingDetails; // Add closing details to the ticket
+            ticket.closed_at = now; // Add the closed timestamp
+
+            fs.writeFileSync(ticketsPath, JSON.stringify(tickets, null, 4));
+            logInfo(`Ticket ${ticket.ticket_id} updated with closing details: ${JSON.stringify(closingDetails)}`);
+
+            // Add the ticket to settings.closedTickets
+            const settings = loadTicketSettings();
+            settings.closedTickets.push({
+                channelId: interaction.channel.id,
+                closedAt: Math.floor(new Date().getTime() / 1000), // Save Unix timestamp for deletion interval check
+            });
+            saveTicketSettings(settings);
+            logInfo(`Ticket ${ticket.ticket_id} added to closedTickets.`);
+        } else {
+            logError(`Ticket not found for channel ID: ${interaction.channel.id}`);
+            return;
+        }
+
+        // Generate the closure embed
         const embed = generateClosureEmbed({
-            closedBy: member.displayName, // Server nickname
-            nickname: member.displayName,
-            timestamp,
+            closedBy: nickname,
+            timestamp: Math.floor(new Date(closingDetails.closed_at).getTime() / 1000),
             resolved,
             summary,
         });
 
-        const channel = interaction.channel;
+        // Format the duration for user-friendly output
+        const ticketCloseDuration = loadTicketSettings().ticketCloseDuration;
+        const formattedDuration = formatDuration(ticketCloseDuration);
 
-        // Process Player Issue logging
-        if (logPlayer && logPlayer.toLowerCase() === 'yes') {
-            logInfo(`Player issue logged for ticket: ${channel.name}`);
-            // Add logic to log the player issue (e.g., save to a database or file)
-        }
+        // Send the closure embed in the ticket channel
+        await interaction.channel.send({
+            embeds: [embed],
+            content: `⏳ This ticket will be deleted in ${formattedDuration} unless reopened.`,
+        });
 
-        await channel.send({ embeds: [embed] });
-        await closeTicket(interaction);
+        // Reply to the interaction
+        await interaction.reply({
+            content: 'Ticket has been closed and recorded successfully.',
+            ephemeral: true,
+        });
     } catch (error) {
         logError(`Failed to handle close ticket submission: ${error.message}`);
-        await interaction.reply({ content: 'An error occurred while closing the ticket.', ephemeral: true });
+        await interaction.reply({
+            content: 'An error occurred while closing the ticket.',
+            ephemeral: true,
+        });
     }
 }
 
@@ -511,6 +559,8 @@ function startTicketDeletionInterval(client) {
 
         logInfo(`Running ticket deletion check at ${now}`);
 
+        const ticketsPath = path.join(__dirname, '../data/tickets.json');
+        const tickets = fs.existsSync(ticketsPath) ? JSON.parse(fs.readFileSync(ticketsPath)) : [];
         const remainingTickets = [];
 
         for (const ticket of settings.closedTickets || []) {
@@ -520,9 +570,17 @@ function startTicketDeletionInterval(client) {
             if (timeElapsed >= settings.ticketCloseDuration) {
                 try {
                     const channel = await client.channels.fetch(ticket.channelId);
+
                     if (channel) {
                         await channel.delete();
                         logInfo(`Deleted ticket channel: ${ticket.channelId}`);
+
+                        const ticketData = tickets.find(t => t.channel_id === ticket.channelId);
+                        if (ticketData) {
+                            await saveTicketToDatabase(ticketData);
+                            ticketData.deleted = true;
+                            logInfo(`Marked ticket ${ticketData.ticket_id} as deleted in tickets.json`);
+                        }
                     }
                 } catch (error) {
                     logError(`Failed to delete ticket channel ${ticket.channelId}: ${error.message}`);
@@ -532,10 +590,98 @@ function startTicketDeletionInterval(client) {
             }
         }
 
-        // Update closedTickets in settings
+        // Clean up tickets.json after saving to database
+        const cleanedTickets = tickets.filter(t => !t.deleted);
+        fs.writeFileSync(ticketsPath, JSON.stringify(cleanedTickets, null, 4));
+        logInfo('Cleaned up tickets.json after saving tickets to the database.');
+
+        // Update closedTickets in `ticketSettings.json`
         settings.closedTickets = remainingTickets;
         saveTicketSettings(settings);
     }, 60 * 1000); // Run every minute
+}
+
+// Save ticket to Database
+async function saveTicketToDatabase(ticket) {
+    try {
+        const createdAt = formatMySQLDatetime(ticket.created_at);
+        const closedAt = ticket.closed_at ? formatMySQLDatetime(ticket.closed_at) : null;
+
+        const resolved = ticket.closing_details?.resolved || null; // Store resolved as text directly
+
+        const query = `
+            INSERT INTO tickets (
+                ticket_id, channel_id, user_id, user_nickname, issue_type, details, tag,
+                created_at, closed_at, messages, assigned_player, closed_by, closed_by_name, resolved, summary
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        const values = [
+            ticket.ticket_id,
+            ticket.channel_id,
+            ticket.user_id,
+            ticket.user_nickname,
+            ticket.issue_type,
+            ticket.details,
+            ticket.tag,
+            createdAt,
+            closedAt,
+            JSON.stringify(ticket.messages || []),
+            JSON.stringify(ticket.assigned_player || null),
+            ticket.closing_details?.closed_by?.user_id || null,
+            ticket.closing_details?.closed_by?.user_nickname || null,
+            resolved, // Store resolved as text
+            ticket.closing_details?.summary || null,
+        ];
+
+        await pool.execute(query, values);
+        logInfo(`Ticket ${ticket.ticket_id} saved to database.`);
+    } catch (error) {
+        logError(`Failed to save ticket ${ticket.ticket_id} to database: ${error.message}`);
+    }
+}
+
+// Utility function to format ISO 8601 timestamps for MySQL DATETIME
+function formatMySQLDatetime(isoDatetime) {
+    const date = new Date(isoDatetime);
+    return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+//Records Message to File
+async function handleTicketMessage(message) {
+    try {
+        // Ignore bot messages
+        if (message.author.bot) return;
+
+        // Path to tickets.json
+        const ticketsPath = path.join(__dirname, '../data/tickets.json');
+        if (!fs.existsSync(ticketsPath)) return;
+
+        // Load tickets data
+        const tickets = JSON.parse(fs.readFileSync(ticketsPath));
+        const ticket = tickets.find(t => t.channel_id === message.channel.id);
+
+        // Check if the message belongs to a ticket
+        if (ticket) {
+            // Fetch server nickname of the user
+            const member = await message.guild.members.fetch(message.author.id);
+            const nickname = member.displayName || message.author.username;
+
+            // Append message to the ticket's messages array
+            ticket.messages.push({
+                user_id: message.author.id,
+                user_nickname: nickname,
+                timestamp: new Date().toISOString(),
+                content: message.content,
+            });
+
+            // Save the updated tickets back to the file
+            fs.writeFileSync(ticketsPath, JSON.stringify(tickets, null, 4));
+            logInfo(`Message logged for ticket ${ticket.ticket_id}: ${message.content}`);
+        }
+    } catch (error) {
+        logError(`Failed to log message: ${error.message}`);
+    }
 }
 
 module.exports = { setupSupportInfo, 
@@ -549,5 +695,7 @@ module.exports = { setupSupportInfo,
                    showDeleteTicketModal, 
                    handleCloseTicketSubmission,
                    handleDeleteTicketSubmission,
-                   startTicketDeletionInterval 
+                   startTicketDeletionInterval,
+                   saveTicketToDatabase,
+                   handleTicketMessage 
                 };

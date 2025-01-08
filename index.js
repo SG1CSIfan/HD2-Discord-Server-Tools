@@ -1,8 +1,7 @@
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const { registerCommands } = require('./handlers/commandHandler');
 const { handleInteraction } = require('./handlers/interactionHandler');
-const { setupSupportInfo } = require('./handlers/ticketHandler');
-const { startTicketDeletionInterval } = require('./handlers/ticketHandler');
+const { setupSupportInfo, startTicketDeletionInterval, handleTicketMessage } = require('./handlers/ticketHandler');
 const { logInfo, logError } = require('./handlers/loggingHandler');
 const { loadTicketSettings } = require('./utils/fileUtils');
 const fs = require('fs');
@@ -94,6 +93,11 @@ client.on('interactionCreate', async (interaction) => {
     } catch (error) {
         logError(`Failed to handle interaction: ${error.message}`);
     }
+});
+
+// Handle message logging in ticket channels
+client.on('messageCreate', async (message) => {
+    await handleTicketMessage(message);
 });
 
 // Login to Discord

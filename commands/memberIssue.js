@@ -1,4 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 const { logInfo, logError } = require('../handlers/loggingHandler');
 
 module.exports = {
@@ -19,10 +21,31 @@ module.exports = {
             const member = await interaction.guild.members.fetch(playerId);
             const channel = interaction.channel;
 
-            // Check if the reported player has the support role
+            // Load ticket settings and JSON data
             const ticketSettings = require('../data/ticketSettings.json');
             const supportRoleId = ticketSettings.roleId;
+            const ticketsPath = path.join(__dirname, '../data/tickets.json');
+            const tickets = fs.existsSync(ticketsPath) ? JSON.parse(fs.readFileSync(ticketsPath)) : [];
+            const ticket = tickets.find(t => t.channel_id === channel.id);
 
+            if (!ticket) {
+                await interaction.reply({
+                    content: 'This ticket could not be found in the records.',
+                    ephemeral: true,
+                });
+                return;
+            }
+
+            // Ensure the ticket is a Player Issue
+            if (ticket.tag !== 'Player Issue') {
+                await interaction.reply({
+                    content: 'This command can only be used for tickets tagged as "Player Issue."',
+                    ephemeral: true,
+                });
+                return;
+            }
+
+            // Remove the player from the channel if they have the support role
             if (member.roles.cache.has(supportRoleId)) {
                 await channel.permissionOverwrites.edit(member.id, {
                     ViewChannel: false, // Deny access to the reported player
@@ -42,6 +65,7 @@ module.exports = {
                 return;
             }
 
+            // Update the embed with the player's server nickname
             const embed = firstEmbedMessage.embeds[0];
             const updatedEmbed = EmbedBuilder.from(embed).setFields(
                 ...embed.fields.map(field => {
@@ -53,6 +77,18 @@ module.exports = {
             );
 
             await firstEmbedMessage.edit({ embeds: [updatedEmbed] });
+
+            // Log the assigned player in tickets.json
+            ticket.assigned_player = {
+                user_id: member.id,
+                user_nickname: member.displayName || member.user.username,
+                assigned_at: new Date().toISOString(),
+            };
+
+            fs.writeFileSync(ticketsPath, JSON.stringify(tickets, null, 4));
+            logInfo(`Assigned player ${member.displayName} (${member.id}) to ticket ${ticket.ticket_id}.`);
+
+            // Confirm the action to the user
             await interaction.reply({
                 content: `Player **${member.displayName}** has been assigned to this Player Issue. They have been removed from this ticket if they belong to the support role.`,
                 ephemeral: true,
