@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const { registerCommands } = require('./handlers/commandHandler');
 const { handleInteraction } = require('./handlers/interactionHandler');
 const { setupSupportInfo, startTicketDeletionInterval, handleTicketMessage } = require('./handlers/ticketHandler');
+const { monitorForum } = require('./handlers/forumMonitor');
 const { logInfo, logError } = require('./handlers/loggingHandler');
 const { loadTicketSettings } = require('./utils/fileUtils');
 const fs = require('fs');
@@ -64,6 +65,11 @@ client.once('ready', async () => {
     await setupSupportInfo(client);
     startTicketDeletionInterval(client);
     logInfo('Support ticket system initialized.');
+
+    setInterval(() => {
+        console.log(`[INFO] Running forum monitoring...`);
+        monitorForum(client);
+    }, 60 * 1000);
 
     try {
         const settings = loadTicketSettings();

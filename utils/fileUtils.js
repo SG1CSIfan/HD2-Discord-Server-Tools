@@ -88,10 +88,27 @@ function loadPromotionSettings() {
     }
 }
 
+function loadModForumSettings(filename) {
+    const settingsPath = path.join(__dirname, `../data/${filename}.json`);
+
+    try {
+        if (!fs.existsSync(settingsPath)) {
+            throw new Error(`Settings file not found: ${filename}`);
+        }
+
+        const data = fs.readFileSync(settingsPath, 'utf-8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error(`Error loading settings: ${error.message}`);
+        return {};
+    }
+}
+
 module.exports = {
     loadTicketSettings,
     saveTicketSettings,
     loadModReportSettings,
     saveModReportSettings,
     loadPromotionSettings,
+    loadModForumSettings,
 };
