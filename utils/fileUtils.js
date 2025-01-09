@@ -104,6 +104,32 @@ function loadModForumSettings(filename) {
     }
 }
 
+function loadAnonymousSubmissionsSettings(fileName) {
+    const settingsPath = path.join(__dirname, '../data', fileName); // Changed to '../data'
+    const defaultSettings = {
+        submissionChannelId: '',
+        rolePings: {
+            general: '',
+            player: '',
+            other: '',
+        },
+    };
+
+    try {
+        if (!fs.existsSync(settingsPath)) {
+            fs.writeFileSync(settingsPath, JSON.stringify(defaultSettings, null, 2));
+            logError(`${fileName} not found. A default file has been created.`);
+            return defaultSettings;
+        }
+
+        const data = fs.readFileSync(settingsPath, 'utf-8');
+        return JSON.parse(data);
+    } catch (error) {
+        logError(`Failed to load settings from ${fileName}: ${error.message}`);
+        return defaultSettings;
+    }
+}
+
 module.exports = {
     loadTicketSettings,
     saveTicketSettings,
@@ -111,4 +137,5 @@ module.exports = {
     saveModReportSettings,
     loadPromotionSettings,
     loadModForumSettings,
+    loadAnonymousSubmissionsSettings,
 };

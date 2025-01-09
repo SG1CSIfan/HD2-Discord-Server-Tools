@@ -24,6 +24,7 @@ const {
     handleEditReport,
     handleEditReportSubmission,
 } = require('./missionReportHandler');
+const { handleAnonymousSubmission } = require('./AnonymousSubmissionHandler');
 const { loadTicketSettings } = require('../utils/fileUtils');
 
 /**
@@ -145,18 +146,20 @@ async function handleInteraction(interaction, client) {
                     break;
 
                 default:
-                    // Use fallback for ticket-related modals
-                    if (interaction.customId.startsWith('submit_')) {
-                        await handleModalSubmission(interaction);
-                    } else {
-                        logError(`Unhandled modal interaction: ${interaction.customId}`);
-                        await interaction.reply({
-                            content: 'This modal interaction is not recognized.',
-                            ephemeral: true,
-                        });
-                    }
+            // Use fallback for specific interactions like report_issue
+            if (interaction.customId.startsWith('report_issue_')) {
+                await handleAnonymousSubmission(interaction);
+            } else if (interaction.customId.startsWith('submit_')) {
+                await handleModalSubmission(interaction);
+            } else {
+                logError(`Unhandled modal interaction: ${interaction.customId}`);
+                await interaction.reply({
+                    content: 'This modal interaction is not recognized.',
+                    ephemeral: true,
+                });
             }
-            return;
+    }
+    return;
         }
 
         // Handle slash commands
