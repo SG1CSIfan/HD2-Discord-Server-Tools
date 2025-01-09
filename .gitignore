@@ -10,3 +10,11 @@ logs/
 # Ignore changes to ticketSettings.json on Mini PC
 !data/ticketSettings.json
 data/ticketSettings.json
+!data/promotionSettings.json
+data/promotionSettings.json
+!data/tickets.json
+data/tickets.json
+!data/modReportSettings.json
+data/modReportSettings.json
+!data/modForumSettings.json
+data/modForumSettings.json
