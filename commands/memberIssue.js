@@ -5,7 +5,7 @@ const { logInfo, logError } = require('../handlers/loggingHandler');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('assign_member')
+        .setName('member_issue')
         .setDescription('Assign a player to a Player Issue ticket.')
         .addStringOption(option =>
             option

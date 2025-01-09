@@ -69,7 +69,7 @@ client.once('ready', async () => {
     setInterval(() => {
         console.log(`[INFO] Running forum monitoring...`);
         monitorForum(client);
-    }, 60 * 1000);
+    }, 15 * 60 * 1000);
 
     try {
         const settings = loadTicketSettings();

@@ -6,7 +6,7 @@ function generateStewardEmbed(member, approver) {
         .setTitle('🎉 Congratulations on Your Promotion to Steward! 🎉')
         .setColor(0x1f8b4c)
         .setDescription(
-            "Entering the 3rd stage of 1st Colonial Operation, we need new leaders and contributors to the greater entity that serves Super Earth and her colonies.\n\n**Your Responsibilities:**\n\n- Help maintain the standards of the 1st Colonial Regiment\n- Support and guide new recruits\n- Step in during MODs if there is a shortage of Deployment Caste and lead a team\n\n**To earn the next rank**, achieve IRON [ V ] (5 IRON) to become eligible for Deployment Officer."
+            "Entering the 3rd stage of 1st Colonial Regiment, we need new leaders and contributors to the greater entity that serves Super Earth and her colonies.\n\n**Your Responsibilities:**\n\n- Help maintain the standards of the 1st Colonial Regiment\n- Support and guide new recruits\n- Step in during MODs if there is a shortage of Deployment Caste and lead a team\n\n**To earn the next rank**, achieve IRON [ V ] (5 IRON) to become eligible for Deployment Officer."
         )
         .addFields(
             { name: 'Approved By', value: approver.displayName, inline: true },

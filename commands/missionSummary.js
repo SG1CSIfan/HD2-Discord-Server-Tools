@@ -9,7 +9,7 @@ const {
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('mod-report-summary')
+        .setName('mod_report_summary')
         .setDescription('Generate a mission report summary.')
         .addStringOption(option =>
             option

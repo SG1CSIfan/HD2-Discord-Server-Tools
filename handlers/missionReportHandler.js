@@ -20,28 +20,28 @@ async function handleOpenMissionReportModal(interaction) {
         .setCustomId('operations')
         .setLabel('Operations (Succeeded / Total)')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Example: 3/5')
+        .setPlaceholder('Example: 3/5 or 3 / 5')
         .setRequired(true);
 
     const missionsInput = new TextInputBuilder()
         .setCustomId('missions')
         .setLabel('Missions (Succeeded / Total)')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Example: 6/7')
+        .setPlaceholder('Example: 6/7 or 6 / 7')
         .setRequired(true);
 
     const squadInput = new TextInputBuilder()
         .setCustomId('squad')
         .setLabel('Squad (List player names)')
         .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Example: Player1, Player2, Player3')
+        .setPlaceholder('Example: Philosophical Bread, Yavi, HoeenHero, SG1CSIfan')
         .setRequired(true);
 
     const missionNotesInput = new TextInputBuilder()
         .setCustomId('mission_info')
         .setLabel('Mission Notes')
         .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Additional mission details (optional)')
+        .setPlaceholder('Additional mission details/notes (optional)')
         .setRequired(false);
 
     modal.addComponents(

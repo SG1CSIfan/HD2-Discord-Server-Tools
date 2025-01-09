@@ -25,7 +25,7 @@ async function monitorForum(client) {
         const events = [];
         for (const thread of threads.threads.values()) {
             if (thread.id === "1300502994625757185") {
-                console.log(`[INFO] Skipping thread: Weekly Schedule (${thread.id})`);
+                // console.log(`[INFO] Skipping thread: Weekly Schedule (${thread.id})`);
                 continue; // Skip "Weekly Schedule"
             }
 
@@ -37,7 +37,7 @@ async function monitorForum(client) {
                     .first(); // Ensure it picks the first bot message
 
                 if (firstBotMessage) {
-                    console.log(`[INFO] Found embed in thread: ${thread.name}`);
+                    // console.log(`[INFO] Found embed in thread: ${thread.name}`);
                     const eventData = parseEventFromEmbed(firstBotMessage.embeds[0], thread.name, thread.url);
                     if (eventData) {
                         events.push(eventData);
@@ -65,7 +65,7 @@ async function monitorForum(client) {
 }
 
 function parseEventFromEmbed(embed, threadTitle, threadUrl) {
-    console.debug('[DEBUG] Processing embed:', embed);
+    // console.debug('[DEBUG] Processing embed:', embed);
 
     const eventData = {
         title: embed.title || threadTitle || 'Untitled Event',

@@ -132,12 +132,14 @@ async function showIssueModal(interaction, issueTag) {
             .setCustomId('issue_type')
             .setLabel('Type of Issue')
             .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Example: Cannot ping on-call role.')
             .setRequired(true);
 
         const issueDetailsInput = new TextInputBuilder()
             .setCustomId('issue_details')
             .setLabel('Details of the Issue')
             .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Example: Everytime i try to ping on-call, it throws me a error.')
             .setRequired(true);
 
         modal.addComponents(
@@ -259,7 +261,7 @@ async function handleModalSubmission(interaction) {
 
         if (issueTag === 'Player Issue') {
             await channel.send({
-                content: `To associate this ticket with a specific player, please use the \`/assignmember\` command.`,
+                content: `To associate this ticket with a specific player, please use the \`/member_issue\` command. If this person is related to <&${supportRole.id}>, they will be removed from this ticket, once you run this command.`,
             });
         }
 
@@ -276,7 +278,7 @@ async function handleModalSubmission(interaction) {
     } catch (error) {
         logError(`Failed to handle modal submission: ${error.message}`);
         await interaction.reply({
-            content: `An error occurred while p rocessing your ticket: ${error.message}`,
+            content: `An error occurred while processing your ticket, please contact an admin: ${error.message}`,
             ephemeral: true,
         });
     }
@@ -366,7 +368,7 @@ async function showCloseTicketModal(interaction) {
     try {
         const modal = new ModalBuilder()
             .setCustomId('close_ticket_modal')
-            .setTitle('Close Ticket');
+            .setTitle('Close Ticket Information');
 
         const resolvedInput = new TextInputBuilder()
             .setCustomId('resolved')
@@ -376,7 +378,7 @@ async function showCloseTicketModal(interaction) {
 
         const summaryInput = new TextInputBuilder()
             .setCustomId('summary')
-            .setLabel('Summary of the issue')
+            .setLabel('Summary of the issue. Please provide details.')
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(true);
 
@@ -407,7 +409,7 @@ async function showDeleteTicketModal(interaction) {
 
     const summaryInput = new TextInputBuilder()
         .setCustomId('summary')
-        .setLabel('Summary of the issue')
+        .setLabel('Summary of the issue. Please provide details.')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(true);
 
