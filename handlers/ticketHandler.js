@@ -261,7 +261,7 @@ async function handleModalSubmission(interaction) {
 
         if (issueTag === 'Player Issue') {
             await channel.send({
-                content: `To associate this ticket with a specific player, please use the \`/member_issue\` command. If this person is related to <&${supportRole.id}>, they will be removed from this ticket, once you run this command.`,
+                content: `To associate this ticket with a specific player, please use the \`/member_issue\` command. If this person is related to <@&${supportRole.id}>, they will be removed from this ticket, once you run this command.`,
             });
         }
 

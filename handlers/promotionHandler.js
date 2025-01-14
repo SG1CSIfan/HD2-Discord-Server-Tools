@@ -88,6 +88,9 @@ async function handlePromotionSubmission(interaction) {
             settings
         );
 
+        // Add user ID to the footer
+        applicationEmbed.setFooter({ text: `User ID: ${member.id}` });
+
         const buttons = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('approve_promotion')
@@ -122,12 +125,18 @@ async function handlePromotionApproval(interaction) {
     }
 
     const embed = interaction.message.embeds[0];
+    const userId = embed.footer?.text?.split('User ID: ')[1];
+
+    if (!userId) {
+        console.error('User ID could not be determined from embed footer.');
+        await interaction.reply({ content: 'Could not determine the user for this application.', ephemeral: true });
+        return;
+    }
+
+    const member = await interaction.guild.members.fetch(userId);
+
     const currentRankField = embed.fields.find(f => f.name === 'Current Rank');
     const eligibleRankField = embed.fields.find(f => f.name === 'Eligible Rank');
-
-    if (!currentRankField || !eligibleRankField) {
-        throw new Error('Current or Eligible Rank fields are missing.');
-    }
 
     const currentRankName = currentRankField.value.split(' ').slice(1).join(' ');
     const nextRankName = eligibleRankField.value.split(' ').slice(1).join(' ');
@@ -136,12 +145,8 @@ async function handlePromotionApproval(interaction) {
     const nextRankData = settings.ranks[nextRankName];
 
     if (!currentRankData || !nextRankData) {
-        throw new Error('Rank data for current or next rank is undefined.');
-    }
-
-    const member = interaction.guild.members.cache.find(m => m.displayName.includes(embed.title.split(' ')[1]));
-    if (!member) {
-        await interaction.reply({ content: 'Could not find the user being promoted.', ephemeral: true });
+        console.error('Rank data for current or next rank is undefined.');
+        await interaction.reply({ content: 'Failed to process the promotion due to missing rank data.', ephemeral: true });
         return;
     }
 
@@ -150,68 +155,85 @@ async function handlePromotionApproval(interaction) {
         await member.roles.remove(currentRankData.casteRoleId);
         await member.roles.add(nextRankData.roleId);
         await member.roles.add(nextRankData.casteRoleId);
+
+        let dmEmbed;
+        switch (nextRankName) {
+            case 'Steward':
+                dmEmbed = generateStewardEmbed(member, approver);
+                break;
+            case 'Deployment Officer':
+                dmEmbed = generateDeploymentOfficerEmbed(member, approver);
+                break;
+            case 'Deployment Supreme':
+                dmEmbed = generateDeploymentSupremeEmbed(member, approver);
+                break;
+            case 'Freedom Captain':
+                dmEmbed = generateFreedomCaptainEmbed(member, approver);
+                break;
+            default:
+                dmEmbed = generateApprovalEmbed(member.displayName, nextRankName, approver.displayName);
+        }
+
+        try {
+            await member.send({ embeds: [dmEmbed] });
+        } catch (error) {
+            console.error(`Failed to send DM to ${member.displayName}: ${error.message}`);
+        }
+
+        const updatedEmbed = EmbedBuilder.from(embed)
+            .addFields(
+                { name: 'Approved By', value: approver.displayName, inline: true },
+                { name: 'Date Approved', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
+            )
+            .setColor(0x1f8b4c);
+
+        await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
+        await interaction.reply({ content: `Promotion for ${member.displayName} to ${nextRankName} has been approved.`, ephemeral: true });
     } catch (error) {
-        console.error(`Failed to update roles for ${member.displayName}: ${error.message}`);
+        console.error(`Failed to process promotion approval: ${error.message}`);
+        await interaction.reply({ content: 'An error occurred while processing the promotion.', ephemeral: true });
     }
-
-    let dmEmbed;
-    switch (nextRankName) {
-        case 'Steward':
-            dmEmbed = generateStewardEmbed(member, approver);
-            break;
-        case 'Deployment Officer':
-            dmEmbed = generateDeploymentOfficerEmbed(member, approver);
-            break;
-        case 'Deployment Supreme':
-            dmEmbed = generateDeploymentSupremeEmbed(member, approver);
-            break;
-        case 'Freedom Captain':
-            dmEmbed = generateFreedomCaptainEmbed(member, approver);
-            break;
-        default:
-            dmEmbed = generateApprovalEmbed(member.displayName, nextRankName, approver.displayName);
-    }
-
-    try {
-        await member.send({ embeds: [dmEmbed] });
-    } catch (error) {
-        console.error(`Failed to send DM to ${member.displayName}: ${error.message}`);
-    }
-
-    const updatedEmbed = EmbedBuilder.from(embed)
-        .addFields(
-            { name: 'Approved By', value: approver.displayName, inline: true },
-            { name: 'Date Approved', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
-        )
-        .setColor(0x1f8b4c);
-
-    await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
-    await interaction.reply({ content: `Promotion for ${member.displayName} to ${nextRankName} has been approved.`, ephemeral: true });
 }
 
 async function handleDenialReasonSubmission(interaction) {
     const reason = interaction.fields.getTextInputValue('denial_reason');
     const embed = interaction.message.embeds[0];
-    const member = interaction.guild.members.cache.find(m => m.displayName.includes(embed.title.split(' ')[1]));
+    const userId = embed.footer?.text?.split('User ID: ')[1]; // Retrieve the user ID from the footer
+
+    if (!userId) {
+        console.error('User ID could not be determined from embed footer.');
+        await interaction.reply({
+            content: 'Could not determine the user for this application.',
+            ephemeral: true,
+        });
+        return;
+    }
+
+    const member = await interaction.guild.members.fetch(userId);
     const approver = interaction.member;
 
     if (!member) {
-        await interaction.reply({ content: 'Could not find the user being denied.', ephemeral: true });
+        await interaction.reply({
+            content: 'Could not find the user associated with this application.',
+            ephemeral: true,
+        });
         return;
     }
 
     const updatedEmbed = generateDenialEmbed(member.displayName, reason, approver.displayName);
 
+    // Update the embed in the application message
     await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
 
     try {
+        // Send a denial notification to the applicant via DM
         await member.send({ embeds: [updatedEmbed] });
-    } catch {
-        console.error(`Failed to send DM to ${member.displayName}`);
+    } catch (error) {
+        console.error(`Failed to send DM to ${member.displayName}: ${error.message}`);
     }
 
     await interaction.reply({
-        content: `Promotion for ${member.displayName} has been denied.`,
+        content: `Promotion application for ${member.displayName} has been denied.`,
         ephemeral: true,
     });
 }

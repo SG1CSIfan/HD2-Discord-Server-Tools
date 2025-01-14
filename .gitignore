@@ -8,13 +8,9 @@ node_modules/
 logs/
 
 # Ignore changes to ticketSettings.json on Mini PC
-!data/ticketSettings.json
-data/ticketSettings.json
-!data/promotionSettings.json
-data/promotionSettings.json
-!data/tickets.json
-data/tickets.json
-!data/modReportSettings.json
-data/modReportSettings.json
-!data/modForumSettings.json
+data/AnonymousSubmissionSettings.json
 data/modForumSettings.json
+data/modReportSettings.json
+data/promotionSettings.json
+data/tickets.json
+data/ticketSettings.json
