@@ -71,14 +71,31 @@ function generateDenialEmbed(member, reason, approver) {
         );
 }
 
-// Generate the promotion application embed
 function generateApplicationEmbed(member, currentIRON, currentRank, eligibleRank, joinedDate, reason, contributions, leader, settings) {
     const embed = new EmbedBuilder()
         .setTitle(`${member.displayName} applied for a Promotion`)
         .setColor(0x1f8b4c)
         .setDescription(`Joined 1CR: ${joinedDate}`);
 
-    // Validate fields before adding them
+    // Helper function to split long text into multiple fields
+    const splitIntoFields = (name, text, maxLength = 1024) => {
+        const fields = [];
+        let remainingText = text;
+
+        while (remainingText.length > maxLength) {
+            const chunk = remainingText.slice(0, maxLength);
+            fields.push({ name, value: chunk, inline: false });
+            remainingText = remainingText.slice(maxLength);
+        }
+
+        if (remainingText.length > 0) {
+            fields.push({ name, value: remainingText, inline: false });
+        }
+
+        return fields;
+    };
+
+    // Validate and add fields, splitting long text as needed
     const fields = [
         { name: 'IRON Level', value: `[ ${currentIRON} ] (${eligibleRank.requiredIRON} IRON)`, inline: true },
         {
@@ -91,12 +108,9 @@ function generateApplicationEmbed(member, currentIRON, currentRank, eligibleRank
             value: `${settings.ranks[eligibleRank.nextRank]?.emoji || ''} ${eligibleRank.nextRank || 'N/A'}`,
             inline: true,
         },
-        { name: 'Reason for Promotion', value: reason || 'No reason provided', inline: false },
-        { name: 'Recent Contributions', value: contributions || 'No contributions provided', inline: false },
-        { name: 'Leader Response', value: leader || 'No leader response provided', inline: false },
     ];
 
-    // Add fields with validation
+    // Add standard fields
     fields.forEach((field) => {
         if (typeof field.name === 'string' && typeof field.value === 'string') {
             embed.addFields(field);
@@ -104,6 +118,11 @@ function generateApplicationEmbed(member, currentIRON, currentRank, eligibleRank
             console.error(`Invalid field detected: ${JSON.stringify(field)}`);
         }
     });
+
+    // Add long text fields using the split helper function
+    splitIntoFields('Reason for Promotion', reason || 'No reason provided').forEach((field) => embed.addFields(field));
+    splitIntoFields('Recent Contributions', contributions || 'No contributions provided').forEach((field) => embed.addFields(field));
+    splitIntoFields('Leader Response', leader || 'No leader response provided').forEach((field) => embed.addFields(field));
 
     return embed;
 }
