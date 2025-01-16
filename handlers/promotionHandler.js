@@ -76,17 +76,24 @@ async function handlePromotionSubmission(interaction) {
         }
 
         const joinedDate = `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>`;
-        const applicationEmbed = generateApplicationEmbed(
-            member,
-            currentIRON,
-            currentRank,
-            eligibleRank,
-            joinedDate,
-            reason,
-            contributions,
-            leader,
-            settings
-        );
+        const applicationEmbed = (() => {
+            try {
+                return generateApplicationEmbed(
+                    member,
+                    currentIRON,
+                    currentRank,
+                    eligibleRank,
+                    joinedDate,
+                    reason,
+                    contributions,
+                    leader,
+                    settings
+                );
+            } catch (error) {
+                console.error('Failed to generate application embed:', error);
+                throw error; // Re-throw to let the caller handle it
+            }
+        })();
 
         // Add user ID to the footer
         applicationEmbed.setFooter({ text: `User ID: ${member.id}` });
