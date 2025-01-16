@@ -73,26 +73,39 @@ function generateDenialEmbed(member, reason, approver) {
 
 // Generate the promotion application embed
 function generateApplicationEmbed(member, currentIRON, currentRank, eligibleRank, joinedDate, reason, contributions, leader, settings) {
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
         .setTitle(`${member.displayName} applied for a Promotion`)
         .setColor(0x1f8b4c)
-        .setDescription(`Joined 1CR: ${joinedDate}`)
-        .addFields(
-            { name: 'IRON Level', value: `[ ${currentIRON} ] (${eligibleRank.requiredIRON} IRON)`, inline: true },
-            {
-                name: 'Current Rank',
-                value: `${settings.ranks[currentRank].emoji || ''} ${currentRank}`,
-                inline: true,
-            },
-            {
-                name: 'Eligible Rank',
-                value: `${settings.ranks[eligibleRank.nextRank]?.emoji || ''} ${eligibleRank.nextRank || 'N/A'}`,
-                inline: true,
-            },
-            { name: 'Reason for Promotion', value: reason, inline: false },
-            { name: 'Recent Contributions', value: contributions, inline: false },
-            { name: 'Leader Response', value: leader, inline: false }
-        );
+        .setDescription(`Joined 1CR: ${joinedDate}`);
+
+    // Validate fields before adding them
+    const fields = [
+        { name: 'IRON Level', value: `[ ${currentIRON} ] (${eligibleRank.requiredIRON} IRON)`, inline: true },
+        {
+            name: 'Current Rank',
+            value: `${settings.ranks[currentRank]?.emoji || ''} ${currentRank || 'N/A'}`,
+            inline: true,
+        },
+        {
+            name: 'Eligible Rank',
+            value: `${settings.ranks[eligibleRank.nextRank]?.emoji || ''} ${eligibleRank.nextRank || 'N/A'}`,
+            inline: true,
+        },
+        { name: 'Reason for Promotion', value: reason || 'No reason provided', inline: false },
+        { name: 'Recent Contributions', value: contributions || 'No contributions provided', inline: false },
+        { name: 'Leader Response', value: leader || 'No leader response provided', inline: false },
+    ];
+
+    // Add fields with validation
+    fields.forEach((field) => {
+        if (typeof field.name === 'string' && typeof field.value === 'string') {
+            embed.addFields(field);
+        } else {
+            console.error(`Invalid field detected: ${JSON.stringify(field)}`);
+        }
+    });
+
+    return embed;
 }
 
 // Generate the promotion approval embed
