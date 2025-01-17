@@ -600,7 +600,7 @@ function startTicketDeletionInterval(client) {
         // Update closedTickets in `ticketSettings.json`
         settings.closedTickets = remainingTickets;
         saveTicketSettings(settings);
-    }, 60 * 1000); // Run every minute
+    }, 15 * 60 * 1000); // Run every minute
 }
 
 // Save ticket to Database

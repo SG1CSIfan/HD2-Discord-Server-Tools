@@ -42,7 +42,9 @@ function generateEventEmbed(events) {
             })
             .join('\n\n');
 
-        embed.addFields({ name: `__${date}__`, value: eventsOnDate });
+        // Format the date as a Discord timestamp in long date format
+        const discordFormattedDate = `<t:${eventsByDate[date][0].startTimestamp}:D>`;
+        embed.addFields({ name: `__${discordFormattedDate}__`, value: eventsOnDate });
     });
 
     return embed;
@@ -51,22 +53,17 @@ function generateEventEmbed(events) {
 function groupEventsByDate(events) {
     const grouped = events.reduce((acc, event) => {
         const date = event.startTimestamp
-            ? new Date(event.startTimestamp * 1000).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-              })
+            ? event.startTimestamp
             : 'Unknown Date';
         if (!acc[date]) acc[date] = [];
         acc[date].push(event);
         return acc;
     }, {});
 
-    // Sort dates and return sorted groups
-    const sortedDates = Object.keys(grouped).sort(
-        (a, b) => new Date(a) - new Date(b)
-    );
+    // Sort dates numerically and return sorted groups
+    const sortedDates = Object.keys(grouped)
+        .sort((a, b) => a - b)
+        .map(date => parseInt(date));
     return sortedDates.reduce((sorted, date) => {
         sorted[date] = grouped[date];
         return sorted;
