@@ -35,7 +35,7 @@ function generateEventEmbed(events) {
 
                 // Add the thread link
                 if (event.threadUrl) {
-                    eventDetails += `\n  - [View Thread](${event.threadUrl})`;
+                    eventDetails += `\n  - [View thread to confirm attendance](${event.threadUrl})`;
                 }
 
                 return eventDetails;

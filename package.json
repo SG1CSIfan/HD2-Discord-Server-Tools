@@ -1,6 +1,6 @@
 {
   "name": "hd2-discord-server-tools",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Helldiver 2 Discord Server Tools and Moderation",
   "main": "index.js",
   "scripts": {
